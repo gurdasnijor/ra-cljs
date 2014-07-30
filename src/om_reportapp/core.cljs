@@ -42,11 +42,15 @@
 ;(filter #(not= (:label %) "Payment Method") (:schema (:schema @app-state)))
 
 
-;(map #(dissoc % :all) (:transactions @app-state))
+;(map #(dissoc % :all) (type (first (:transactions @app-state)))
 
 
 
-; (map #(dom/th nil   (:label %) ) (:schema (:schema @app-state)  ) )
+; (map #(dom/th nil   (:label %) ) (sort-by :name (:schema (:schema @app-state)  ) )
+
+
+;(into (sorted-map) (first (:transactions @app-state)))
+
 
 
 
@@ -56,7 +60,7 @@
     om/IRender
     (render [this]
       (apply dom/tr #js {:className "data-row"}
-        (map (fn [cell] (dom/td nil cell)) (vals tx))))))
+        (map #(dom/td nil %) (vals (into (sorted-map) tx)))))))
 
 
 
@@ -66,7 +70,7 @@
       (render [this]
         (dom/thead nil
           (apply dom/tr nil
-            (om/build-all #(dom/th nil   (:label %) ) (:columns data) ))))))
+            (om/build-all #(dom/th nil (:label %)) (:columns data) ))))))
 
 
 
@@ -85,7 +89,7 @@
       (dom/h2 nil "Transaction list")
         (dom/div #js {:className "ui-table"}
         (dom/table nil
-          (om/build thead-view {:columns (:schema (:schema app))})
+          (om/build thead-view {:columns  (sort-by :name (:schema (:schema app)))})
           (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))    }))))))
 
 
