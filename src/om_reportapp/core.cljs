@@ -38,7 +38,20 @@
 
 
 
-(defn tx-row [tx owner]
+
+;(filter #(not= (:label %) "Payment Method") (:schema (:schema @app-state)))
+
+
+;(map #(dissoc % :all) (:transactions @app-state))
+
+
+
+; (map #(dom/th nil   (:label %) ) (:schema (:schema @app-state)  ) )
+
+
+
+
+(defn tx-tr [tx owner]
   (reify
     om/IRender
     (render [this]
@@ -47,13 +60,22 @@
 
 
 
+(defn thead-view [data owner]
+  (reify
+      om/IRender
+      (render [this]
+        (dom/thead nil
+          (apply dom/tr nil
+            (om/build-all #(dom/th nil   (:label %) ) (:columns data) ))))))
+
+
+
 (defn tbody-view [data owner]
   (reify
       om/IRender
       (render [this]
         (apply dom/tbody nil
-          (om/build-all tx-row (:rows data))))))
-
+          (om/build-all tx-tr (:rows data))))))
 
 
 (defn table-view [app owner]
@@ -63,7 +85,8 @@
       (dom/h2 nil "Transaction list")
         (dom/div #js {:className "ui-table"}
         (dom/table nil
-          (om/build tbody-view {:rows (:transactions app), :columns (:schema (:schema app))}))))))
+          (om/build thead-view {:columns (:schema (:schema app))})
+          (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))    }))))))
 
 
 
