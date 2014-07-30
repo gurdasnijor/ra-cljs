@@ -12,7 +12,7 @@
 
 (def tx-endpoint "https://controlpanel.ogprojectx.us/api/transactions/v0/query/f207b2a8-22f4-49b3-969b-6431c1672b9f")
 (def tx-schema-endpoint "https://controlpanel.ogprojectx.us/api/transactions/v0/schema/f207b2a8-22f4-49b3-969b-6431c1672b9f")
-
+  
 
 (def request-options {:with-credentials? false :headers {"Authorization" "Token token=30f3e25fa4349d83545ab5a26c74f3ce"}})
 
@@ -34,7 +34,7 @@
 
 (get-tx-schema)
 
-(get-tx 0 10)
+(get-tx 0 100)
 
 
 
@@ -42,8 +42,8 @@
   (reify
     om/IRender
     (render [this]
-      (dom/tr nil
-        (dom/td nil ((keyword "Payee/Customer/Vendor Name") tx))))))
+      (apply dom/tr #js {:className "data-row"}
+        (map (fn [cell] (dom/td nil cell)) (vals tx))))))
 
 
 
@@ -61,8 +61,9 @@
     om/IRender
     (render [this]
       (dom/h2 nil "Transaction list")
-      (dom/table nil
-        (om/build tbody-view {:rows (:transactions app), :columns (:schema (:schema app))})))))
+        (dom/div #js {:className "ui-table"}
+        (dom/table nil
+          (om/build tbody-view {:rows (:transactions app), :columns (:schema (:schema app))}))))))
 
 
 
