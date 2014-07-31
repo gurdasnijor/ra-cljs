@@ -36,10 +36,6 @@
       (swap! app-state assoc :schema (:body response)))))
 
 
-(get-tx-schema)
-
-(get-tx 0 100)
-
 
 (defn record-contains[record value]
     (some #(not= (.indexOf % value) -1) (filter #(not= % nil) (vals record))))
@@ -91,8 +87,14 @@
     om/IInitState
     (init-state [_]
       {:search-term ""})
+
+    om/IWillMount
+    (will-mount [_]
+      (get-tx-schema)
+      (get-tx 0 500))
+
     om/IRenderState
-    (render-state [_   state]
+    (render-state [_ state]
 
         (dom/div #js {:className "ui-table"}
           (dom/h1 nil (om/get-state owner :search-term))
