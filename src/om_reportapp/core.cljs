@@ -38,19 +38,22 @@
 
 (get-tx-schema)
 
-(get-tx 0 10)
+(get-tx 0 100)
 
 
+(defn record-contains[record value]
+    (some #(not= (.indexOf % value) -1) (filter #(not= % nil) (vals record))))
 
 
 (defn handle-search-keydown [e app owner]
   (when (== (.-which e) ENTER_KEY)
     (let [new-field (om/get-node owner "tx-search")]
-      (when-not (string/blank? (.. new-field -value trim))
+
         (let [search-term (.-value new-field)]
 
+          (om/set-state! owner :search-term search-term)
           (.log js/console search-term)
-          (comment (set! (.-value new-field) ""))  )) false)))
+          (comment (set! (.-value new-field) ""))  ) false)))
 
 
 (defn tx-tr [tx owner]
@@ -74,34 +77,38 @@
 
 (defn tbody-view [data owner]
   (reify
-      om/IRender
-      (render [this]
-        (apply dom/tbody nil
-          (om/build-all tx-tr (:rows data))))))
+      om/IRenderState
+      (render-state [this {:keys [search-term]}]
+        (.log js/console (str search-term))
 
+        (apply dom/tbody nil
+          (om/build-all tx-tr (filter #(record-contains % search-term) (:rows data)))))))
 
 
 
 (defn table-view [app owner]
   (reify
-    om/IRender
-    (render [this]
-      (dom/h1 nil "Transaction list")
-        (dom/div #js {:className "ui-table"}
+    om/IInitState
+    (init-state [_]
+      {:search-term ""})
+    om/IRenderState
+    (render-state [_   state]
 
+        (dom/div #js {:className "ui-table"}
+          (dom/h1 nil (om/get-state owner :search-term))
 
           (dom/form #js{:className "ui-search" :style #js{"width" "200px"}}
             (dom/span #js{:className "icon-search-1"})
             (dom/input
-              #js {:ref "tx-search" :id "tx-search"
+              #js {:ref "tx-search"
+                   :id "tx-search"
                    :placeholder "Search..."
-
                    :type "search"
                    :onKeyDown #(handle-search-keydown % app owner)}))
 
         (dom/table nil
           (om/build thead-view {:columns (sort-by :name (:schema (:schema app)))})
-          (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))}))))))
+          (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))} {:state state}   ))))))
 
 
 
