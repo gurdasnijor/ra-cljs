@@ -2,6 +2,7 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
+            [clojure.string :as string]
             [cljs-http.client :as http]
             [cljs.core.async :refer [>! <! chan put!]]))
 
@@ -15,6 +16,9 @@
   
 
 (def request-options {:with-credentials? false :headers {"Authorization" "Token token=30f3e25fa4349d83545ab5a26c74f3ce"}})
+
+
+(def ENTER_KEY 13)
 
 
 (def app-state (atom {}))
@@ -34,25 +38,19 @@
 
 (get-tx-schema)
 
-(get-tx 0 100)
+(get-tx 0 10)
 
 
 
 
-;(filter #(not= (:label %) "Payment Method") (:schema (:schema @app-state)))
+(defn handle-search-keydown [e app owner]
+  (when (== (.-which e) ENTER_KEY)
+    (let [new-field (om/get-node owner "tx-search")]
+      (when-not (string/blank? (.. new-field -value trim))
+        (let [search-term (.-value new-field)]
 
-
-;(map #(dissoc % :all) (type (first (:transactions @app-state)))
-
-
-
-; (map #(dom/th nil   (:label %) ) (sort-by :name (:schema (:schema @app-state)  ) )
-
-
-;(into (sorted-map) (first (:transactions @app-state)))
-
-
-
+          (.log js/console search-term)
+          (comment (set! (.-value new-field) ""))  )) false)))
 
 
 (defn tx-tr [tx owner]
@@ -82,15 +80,28 @@
           (om/build-all tx-tr (:rows data))))))
 
 
+
+
 (defn table-view [app owner]
   (reify
     om/IRender
     (render [this]
-      (dom/h2 nil "Transaction list")
+      (dom/h1 nil "Transaction list")
         (dom/div #js {:className "ui-table"}
+
+
+          (dom/form #js{:className "ui-search" :style #js{"width" "200px"}}
+            (dom/span #js{:className "icon-search-1"})
+            (dom/input
+              #js {:ref "tx-search" :id "tx-search"
+                   :placeholder "Search..."
+
+                   :type "search"
+                   :onKeyDown #(handle-search-keydown % app owner)}))
+
         (dom/table nil
-          (om/build thead-view {:columns  (sort-by :name (:schema (:schema app)))})
-          (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))    }))))))
+          (om/build thead-view {:columns (sort-by :name (:schema (:schema app)))})
+          (om/build tbody-view {:rows (map #(dissoc % :all)(:transactions app))}))))))
 
 
 
