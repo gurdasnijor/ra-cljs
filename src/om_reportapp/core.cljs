@@ -21,23 +21,57 @@
 (def app-state (atom {:schema [] :transactions []}))
 
 
-
-(defn get-tx [offset limit search]
+;{"sort":[{"COMMENT":"desc"}]
+;{"sort":[{"COMMENT":"asc"}]
+(defn get-tx [offset limit search sort]
   (go
-    (let [response (<! (http/post tx-endpoint (conj request-options {:json-params {:offset offset :limit limit :filter {:all {:contains search}}     }})  ))]
-      (swap! app-state assoc :transactions (:transactions (:body response)) :total (:total_count_estimate response))   )))
+   (let [response (<! (http/post tx-endpoint (conj request-options {:json-params {:offset offset :limit limit :filter {:all {:contains search}}      }})  ))]
+     (swap! app-state assoc :transactions (:transactions (:body response)) :total (:total_count_estimate response))   )))
 
 
 
 (defn get-tx-schema []
   (go
-    (let [response (<! (http/get tx-schema-endpoint request-options))]
-      (swap! app-state assoc :schema (:schema (:body response))))))
+   (let [response (<! (http/get tx-schema-endpoint request-options))]
+     (swap! app-state assoc :schema (:schema (:body response))))))
 
 
 
-(defn record-contains[record value]
-    (some #(not= (.indexOf (string/upper-case %) (string/upper-case value)) -1) (filter #(not= % nil) (vals record))))
+;(defn record-contains[record value]
+;  (some #(not= (.indexOf (string/upper-case %) (string/upper-case value)) -1) (filter #(not= % nil) (vals record))))
+
+
+
+
+
+
+
+(defn handle-search-keydown [e app owner comm]
+  (when (== (.-which e) ENTER_KEY)
+    (let [new-field (om/get-node owner "tx-search")]
+      (let [search-term (.-value new-field)]
+        (put! comm [:search search-term])
+        (comment (set! (.-value new-field) ""))  ) false)))
+
+
+
+(defn search-view [_ owner]
+  (reify
+    om/IRenderState
+    (render-state [_ {:keys [comm] :as state}]
+      (dom/form #js{:className "ui-search" :style #js{"width" "200px"}}
+        (dom/span #js{:className "icon-search-1"})
+        (dom/input #js {:ref "tx-search"
+                        :id "tx-search"
+                        :placeholder "Search..."
+                        :type "search"
+                        :onKeyDown #(handle-search-keydown % _ owner comm)})))))
+
+
+
+
+
+
 
 
 
@@ -45,104 +79,121 @@
   (reify
     om/IRender
     (render [this]
-      (apply dom/tr #js {:className "data-row"}
-        (map #(dom/td nil %) (vals (into (sorted-map) tx)))))))
+            (apply dom/tr #js {:className "data-row"}
+                   (map #(dom/td nil %) (vals (into (sorted-map) tx)))))))
+
+
+
+
+
+
+
+
+(defn handle-sort-click [e label owner comm]
+
+  (put! comm [:sort label]))
+
+
+
+
+
+(defn thead-th-view [{:keys[sort label]} owner]
+  (reify
+     om/IRenderState
+    (render-state [_ {:keys [comm] :as state}]
+      (dom/th #js {:onClick #(handle-sort-click % label owner comm)}   (str label sort) ))))
+
+
 
 
 
 (defn thead-view [data owner]
   (reify
-      om/IRender
-      (render [this]
-        (dom/thead nil
-          (apply dom/tr nil
-            (om/build-all #(dom/th nil (:label %)) data ))))))
+     om/IRenderState
+    (render-state [_ {:keys [comm] :as state}]
+      (dom/thead nil
+         (apply dom/tr nil
+            (om/build-all thead-th-view data {:init-state {:comm comm}} ))))))
+
+
+
 
 
 
 (defn tbody-view [data owner]
   (reify
-      om/IRenderState
-      (render-state [this state]
-        (.log js/console (str search-term))
-
-        (apply dom/tbody nil
-          (om/build-all tx-tr data)))))
-
+    om/IRenderState
+    (render-state [this state]
+                  (.log js/console (str search-term))
+                  (apply dom/tbody nil
+                         (om/build-all tx-tr data)))))
 
 
 
 
 
+(def teams
+[ {:name "Manchester United" :points 1200}
+{:name "Manchester City" :points 1200} ])
 
- (defn handle-event [type app val]
+
+ (map #(if (= "Manchester United" (:name %))
+         (assoc % :points 1500) %)
+      teams)
+
+
+
+(defn sort-column [app label]
+
+   (om/transact! app :schema
+     (fn [columns] (map #(if (= label (:label %))
+                               (assoc % :sort "asc")
+                               (assoc % :sort "desc")) columns))))
+
+
+
+
+
+
+
+(defn handle-event [type app val]
   (case type
     :search   (get-tx 0 2000 val)
+    :sort (sort-column app val)
+    :reorder (.log js/console val)
+    :row-select (.log js/console val)
+    :group (.log js/console val)
+    :row-visibility-toggle (.log js/console val)
     nil))
 
 
 
 
- (defn handle-search-keydown [e app owner comm]
-  (when (== (.-which e) ENTER_KEY)
-    (let [new-field (om/get-node owner "tx-search")]
-
-        (let [search-term (.-value new-field)]
-          ;(get-tx 0 1000 search-term)
-
-           (put! comm [:search search-term])
-
-          ;(om/set-state! owner :search-term search-term)
-          ;(.log js/console search-term)
-          (comment (set! (.-value new-field) ""))  ) false)))
-
-
-
-
-
- (defn search-view [_ owner]
-   (reify
-   om/IRenderState
-   (render-state [_ {:keys [comm] :as state}]
-     (dom/form #js{:className "ui-search" :style #js{"width" "200px"}}
-              (dom/span #js{:className "icon-search-1"})
-              (dom/input
-                #js {:ref "tx-search"
-                     :id "tx-search"
-                     :placeholder "Search..."
-                     :type "search"
-                     :onKeyDown #(handle-search-keydown % _ owner comm)})))))
-
-
-
-
-   (defn table-view[{:keys [schema transactions] :as app} owner]
-    (reify
-      om/IWillMount
+(defn table-view[app owner]
+  (reify
+    om/IWillMount
     (will-mount [_]
       (get-tx-schema)
       (get-tx 0 500)
 
       (let [comm (chan)]
-
         (om/set-state! owner :comm comm)
         (go (while true
-              (let [[type value] (<! comm)]
-                (handle-event type app value))))))
-      om/IRenderState
-      (render-state [_ state] 
-        (dom/div #js {:className "ui-table"}
-
-           (om/build search-view app)
-           (dom/table nil
-            (om/build thead-view schema )
-            (om/build tbody-view transactions ))))))
+          (let [[type value] (<! comm)]
+            (handle-event type app value))))))
+    om/IRenderState
+    (render-state [_ {:keys [comm]}] 
+                  (dom/div #js {:className "ui-table"}
+                           (om/build search-view app {:init-state {:comm comm}})
+                           (dom/table nil
+                                      (om/build thead-view (:schema app)  {:init-state {:comm comm}} )
+                                      (om/build tbody-view (:transactions app) ))))))
 
 
 
 
 (om/root table-view app-state
-   {:target (.getElementById js/document "app")})
+         {:target (.getElementById js/document "app")})
 
 
 
