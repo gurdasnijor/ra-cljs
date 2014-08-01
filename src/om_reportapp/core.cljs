@@ -18,18 +18,18 @@
 (def ENTER_KEY 13)
 
 
-(def app-state (atom {:schema [] :transactions []}))
+(def app-state (atom {:schema [] :transactions [] :query {:offset 0 :limit 200}}))
 
 
-
-(defn get-tx [offset limit search sort]
+(defn get-tx! [query]
+  (swap! app-state update-in [:query] (fn [e] (merge e query)))
   (go
-   (let [response (<! (http/post tx-endpoint (conj request-options {:json-params {:offset offset :limit limit :filter {:all {:contains search}} :sort [sort]      }})  ))]
+   (let [response (<! (http/post tx-endpoint (conj request-options {:json-params (:query @app-state) })))]
      (swap! app-state assoc :transactions (:transactions (:body response)) :total (:total_count_estimate response))   )))
 
 
 
-(defn get-tx-schema []
+(defn get-tx-schema! []
   (go
    (let [response (<! (http/get tx-schema-endpoint request-options))]
      (swap! app-state assoc :schema (:schema (:body response))))))
@@ -38,9 +38,6 @@
 
 ;(defn record-contains[record value]
 ;  (some #(not= (.indexOf (string/upper-case %) (string/upper-case value)) -1) (filter #(not= % nil) (vals record))))
-
-
-
 
 
 
@@ -69,20 +66,12 @@
 
 
 
-
-
-
-
-
 (defn tx-tr [tx owner]
   (reify
     om/IRender
     (render [this]
             (apply dom/tr #js {:className "data-row"}
                    (map #(dom/td nil %) (vals (into (sorted-map) tx)))))))
-
-
-
 
 
 
@@ -103,8 +92,6 @@
 
 
 
-
-
 (defn thead-view [data owner]
   (reify
      om/IRenderState
@@ -112,9 +99,6 @@
       (dom/thead nil
          (apply dom/tr nil
             (om/build-all thead-th-view data {:init-state {:comm comm}} ))))))
-
-
-
 
 
 
@@ -129,12 +113,19 @@
 
 
 
+
+
+;;Global handlers
+
+
+
+(defn search [search-term]
+    (get-tx! (if (not (string/blank? search-term)) {:filter {:all {:contains search-term}}} {:filter {}})))
+
+
+
 (defn sort-column [app label]
-
-
-   ;TODO Fix get-tx function to accept options hash instead of fixed-arity function
-   (get-tx 0 100 "a" {label "asc"})
-
+   (get-tx! {:sort [{label "asc"}]})
    (om/transact! app :schema
      (fn [columns] (map #(if (= label (:label %))
                                (assoc % :sort "asc")
@@ -143,12 +134,9 @@
 
 
 
-
-
-
 (defn handle-event [type app val]
   (case type
-    :search   (get-tx 0 2000 val)
+    :search   (search val)
     :sort (sort-column app val)
     :reorder (.log js/console val)
     :row-select (.log js/console val)
@@ -163,10 +151,10 @@
   (reify
     om/IWillMount
     (will-mount [_]
-      (get-tx-schema)
-      (get-tx 0 100)
-
       (let [comm (chan)]
+        (get-tx-schema!)
+        (get-tx!)
+
         (om/set-state! owner :comm comm)
         (go (while true
           (let [[type value] (<! comm)]
@@ -174,6 +162,9 @@
     om/IRenderState
     (render-state [_ {:keys [comm]}] 
                   (dom/div #js {:className "ui-table"}
+
+                            (dom/label nil (print-str (:query app)))
+
                            (om/build search-view app {:init-state {:comm comm}})
                            (dom/table nil
                                       (om/build thead-view (:schema app)  {:init-state {:comm comm}} )
