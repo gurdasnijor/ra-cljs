@@ -21,11 +21,10 @@
 (def app-state (atom {:schema [] :transactions []}))
 
 
-;{"sort":[{"COMMENT":"desc"}]
-;{"sort":[{"COMMENT":"asc"}]
+
 (defn get-tx [offset limit search sort]
   (go
-   (let [response (<! (http/post tx-endpoint (conj request-options {:json-params {:offset offset :limit limit :filter {:all {:contains search}}      }})  ))]
+   (let [response (<! (http/post tx-endpoint (conj request-options {:json-params {:offset offset :limit limit :filter {:all {:contains search}} :sort [sort]      }})  ))]
      (swap! app-state assoc :transactions (:transactions (:body response)) :total (:total_count_estimate response))   )))
 
 
@@ -90,7 +89,6 @@
 
 
 (defn handle-sort-click [e label owner comm]
-
   (put! comm [:sort label]))
 
 
@@ -131,19 +129,11 @@
 
 
 
-
-(def teams
-[ {:name "Manchester United" :points 1200}
-{:name "Manchester City" :points 1200} ])
-
-
- (map #(if (= "Manchester United" (:name %))
-         (assoc % :points 1500) %)
-      teams)
-
-
-
 (defn sort-column [app label]
+
+
+   ;TODO Fix get-tx function to accept options hash instead of fixed-arity function
+   (get-tx 0 100 "a" {label "asc"})
 
    (om/transact! app :schema
      (fn [columns] (map #(if (= label (:label %))
@@ -174,7 +164,7 @@
     om/IWillMount
     (will-mount [_]
       (get-tx-schema)
-      (get-tx 0 500)
+      (get-tx 0 100)
 
       (let [comm (chan)]
         (om/set-state! owner :comm comm)
