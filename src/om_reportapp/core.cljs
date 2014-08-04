@@ -77,18 +77,18 @@
 
 
 
-(defn handle-sort-click [e label owner comm]
-  (put! comm [:sort label]))
+(defn handle-sort-click [e data owner comm]
+  (put! comm [:sort data]))
 
 
 
 
 
-(defn thead-th-view [{:keys[sort label]} owner]
+(defn thead-th-view [data owner]
   (reify
      om/IRenderState
     (render-state [_ {:keys [comm] :as state}]
-      (dom/th #js {:onClick #(handle-sort-click % label owner comm)}   (str label sort) ))))
+      (dom/th #js {:onClick #(handle-sort-click % @data owner comm)}   (str (:label data) (:sort data) ) ))))
 
 
 
@@ -114,6 +114,7 @@
 
 
 
+;(filter #(= (:label %) "Payment Method") (:schema @app-state))   ;["Payment "]
 
 ;;Global handlers
 
@@ -124,13 +125,13 @@
 
 
 
-(defn sort-column [app label]
-   (get-tx! {:sort [{label "asc"}]})
+(defn sort-column [app {:keys [label sort]}]
+  (let [toggled-sort (if (or (= sort "desc") (= sort nil)) "asc" "desc")]
+   (get-tx! {:sort [{label toggled-sort}]})
    (om/transact! app :schema
-     (fn [columns] (map #(if (= label (:label %))
-                               (assoc % :sort "asc")
-                               (assoc % :sort "desc")) columns))))
-
+     (fn [columns] (vec (map #(if (= label (:label %))
+                               (assoc % :sort toggled-sort)
+                               (assoc % :sort nil)) columns))))))
 
 
 
@@ -161,14 +162,14 @@
             (handle-event type app value))))))
     om/IRenderState
     (render-state [_ {:keys [comm]}] 
-                  (dom/div #js {:className "ui-table"}
+      (dom/div #js {:className "ui-table"}
 
-                            (dom/label nil (print-str (:query app)))
+                (dom/label nil (print-str (:query app)))
 
-                           (om/build search-view app {:init-state {:comm comm}})
-                           (dom/table nil
-                                      (om/build thead-view (:schema app)  {:init-state {:comm comm}} )
-                                      (om/build tbody-view (:transactions app) ))))))
+               (om/build search-view app {:init-state {:comm comm}})
+               (dom/table nil
+                          (om/build thead-view (:schema app)  {:init-state {:comm comm}} )
+                          (om/build tbody-view (:transactions app) ))))))
 
 
 
