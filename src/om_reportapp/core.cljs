@@ -36,12 +36,6 @@
 
 
 
-;(defn record-contains[record value]
-;  (some #(not= (.indexOf (string/upper-case %) (string/upper-case value)) -1) (filter #(not= % nil) (vals record))))
-
-
-
-
 (defn handle-search-keydown [e app owner comm]
   (when (== (.-which e) ENTER_KEY)
     (let [new-field (om/get-node owner "tx-search")]
@@ -66,12 +60,25 @@
 
 
 
+
+
+;http://stackoverflow.com/questions/5430557/how-to-reorder-a-map-in-clojure
+
+(defn asort [m order]
+  (let [order-map (apply hash-map (interleave order (range)))]
+    (conj
+      (sorted-map-by #(compare (order-map %1) (order-map %2))) ; empty map with the desired ordering
+      (select-keys m order))))
+
+
+
+
 (defn tx-tr [tx owner]
   (reify
     om/IRender
     (render [this]
             (apply dom/tr #js {:className "data-row"}
-                   (map #(dom/td nil %) (vals (into (sorted-map) tx)))))))
+                   (map #(dom/td nil %) (vals tx))))))
 
 
 
@@ -108,13 +115,13 @@
     (render-state [this state]
                   (.log js/console (str search-term))
                   (apply dom/tbody nil
-                         (om/build-all tx-tr data)))))
+                         (om/build-all tx-tr data )))))
 
 
 
 
 
-;(filter #(= (:label %) "Payment Method") (:schema @app-state))   ;["Payment "]
+
 
 ;;Global handlers
 
@@ -148,6 +155,22 @@
 
 
 
+
+ ;  (first (:transactions @app-state))
+
+ ; (map keyword (map :label (:schema @app-state)))
+
+
+
+
+
+;(asort (first (:transactions @app-state))  (map keyword (map :label (:schema @app-state))) )
+
+
+;(map #(asort % (map keyword (map :label (:schema @app-state))) )  (:transactions @app-state))
+
+
+
 (defn table-view[app owner]
   (reify
     om/IWillMount
@@ -169,7 +192,8 @@
                (om/build search-view app {:init-state {:comm comm}})
                (dom/table nil
                           (om/build thead-view (:schema app)  {:init-state {:comm comm}} )
-                          (om/build tbody-view (:transactions app) ))))))
+                          (om/build tbody-view (map #(asort % (map keyword (map :label (:schema app))) )  (:transactions app)) ))))))
+
 
 
 
